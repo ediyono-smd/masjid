@@ -23,12 +23,14 @@ class HomeController extends Controller
 
         $mosques = $this->mosqueService->getVerifiedMosques(6, $search, $province);
 
-        $stats = [
-            'total_mosques' => Mosque::where('status', MosqueStatus::VERIFIED)->count(),
-            'total_events' => Event::where('status', 'UPCOMING')->count(),
-            'total_donations' => (float) Donation::where('status', 'VERIFIED')->sum('amount'),
-            'total_provinces' => Mosque::where('status', MosqueStatus::VERIFIED)->distinct('province')->count('province'),
-        ];
+        $stats = \Illuminate\Support\Facades\Cache::remember('home_stats', 300, function () {
+            return [
+                'total_mosques' => Mosque::where('status', MosqueStatus::VERIFIED)->count(),
+                'total_events' => Event::where('status', 'UPCOMING')->count(),
+                'total_donations' => (float) Donation::where('status', 'VERIFIED')->sum('amount'),
+                'total_provinces' => Mosque::where('status', MosqueStatus::VERIFIED)->distinct('province')->count('province'),
+            ];
+        });
 
         $featuredEvents = Event::where('status', 'UPCOMING')
             ->with(['mosque', 'category'])
@@ -43,10 +45,13 @@ class HomeController extends Controller
             ->get();
 
         $provinces = Mosque::where('status', MosqueStatus::VERIFIED)
+            ->whereNotNull('province')
             ->distinct()
             ->pluck('province')
+            ->filter()
             ->sort()
-            ->values();
+            ->values()
+            ->all();
 
         return view('public.home', compact('mosques', 'stats', 'featuredEvents', 'latestNews', 'provinces', 'search', 'province'));
     }
